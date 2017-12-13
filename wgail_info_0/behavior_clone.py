@@ -21,8 +21,8 @@ def get_feat(imgs, feat_extractor):
 
 
 def main():
-    param_dir = "/home/yunzhu/Desktop/wgail_info_low_h_params/params/"
-    demo_dir = "/home/yunzhu/Desktop/human_low/"
+    param_dir = "/home/slxlab/Downloads/wgail_info_low_h_params/params/"
+    demo_dir = "/home/slxlab/Downloads/human_low/"
     feat_dim = [7, 13, 1024]
     aux_dim = 10
     encode_dim = 2

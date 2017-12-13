@@ -20,7 +20,8 @@ from keras.utils.np_utils import to_categorical
 
 
 parser = argparse.ArgumentParser(description="TRPO")
-parser.add_argument("--paths_per_collect", type=int, default=10)
+# parser.add_argument("--paths_per_collect", type=int, default=3)
+parser.add_argument("--paths_per_collect", type=int, default=30)
 parser.add_argument("--max_step_limit", type=int, default=300)
 parser.add_argument("--min_step_limit", type=int, default=100)
 parser.add_argument("--pre_step", type=int, default=100)
@@ -37,9 +38,13 @@ parser.add_argument("--lr_baseline", type=float, default=1e-4)
 parser.add_argument("--b_iter", type=int, default=25)
 parser.add_argument("--lr_posterior", type=float, default=1e-4)
 parser.add_argument("--p_iter", type=int, default=50)
+# parser.add_argument("--buffer_size", type=int, default=75)
+# parser.add_argument("--sample_size", type=int, default=50)
+# parser.add_argument("--batch_size", type=int, default=500)
 parser.add_argument("--buffer_size", type=int, default=75)
 parser.add_argument("--sample_size", type=int, default=50)
 parser.add_argument("--batch_size", type=int, default=500)
+
 
 args = parser.parse_args()
 
@@ -116,7 +121,7 @@ class TRPOAgent(object):
         self.action_dist_logstd = action_dist_logstd
         N = tf.shape(feats)[0]
         # compute probabilities of current actions and old actions
-        log_p_n = gauss_log_prob(action_dist_mu, action_dist_logstd, actions)
+        log_p_n = gauss_log_prob(action_dist_mu, action_dist_logstd, actions)###
         log_oldp_n = gauss_log_prob(oldaction_dist_mu, oldaction_dist_logstd, actions)
 
         ratio_n = tf.exp(log_p_n - log_oldp_n)
@@ -214,7 +219,7 @@ class TRPOAgent(object):
 
         p_n = discriminate([imgs_n, auxs_n, actions_n])
         p_d = discriminate([imgs_d, auxs_d, actions_d])
-        p_d = Lambda(lambda x: -x)(p_d)
+        p_d = Lambda(lambda x: -x)(p_d) # small anonymous functions f(x) = -x
         p_output = merge([p_n, p_d], mode='sum')
 
         model = Model(input=[imgs_n, auxs_n, actions_n,
@@ -292,14 +297,15 @@ class TRPOAgent(object):
         imgs_d = (imgs_d - 128.) / 128.
         print "Shape of resized demo images:", imgs_d.shape
 
-        for i in xrange(38, config.n_iter):
-
+        # for i in xrange(38, config.n_iter):
+        for i in xrange(0, config.n_iter):
+            print "config.n_iter =======", config.n_iter
             # Generating paths.
-            # if i == 1:
-            if i == 38:
-                paths_per_collect = 30
-            else:
-                paths_per_collect = 10
+            paths_per_collect = 10
+            # if i == 38:
+            #     paths_per_collect = 3#30
+            # else:
+            #     paths_per_collect = 1#10
             rollouts = rollout_contin(
                 self.env,
                 self,
@@ -349,7 +355,7 @@ class TRPOAgent(object):
                 d_iter = 120 - i * 20
             else:
                 d_iter = 10
-            for k in xrange(d_iter):
+            for k in xrange(d_iter):#step1: update D
                 loss = self.discriminator.train_on_batch(
                     [imgs_n[start_n:start_n + batch_size],
                      auxs_n[start_n:start_n + batch_size],
@@ -392,7 +398,7 @@ class TRPOAgent(object):
             encodes_val = encodes_n[idx][numno_train:]
 
             start_n = 0
-            for j in xrange(config.p_iter):
+            for j in xrange(config.p_iter):#step2: update Q
                 loss = self.posterior.train_on_batch(
                     [imgs_train[start_n:start_n + batch_size],
                      auxs_train[start_n:start_n + batch_size],
@@ -415,11 +421,11 @@ class TRPOAgent(object):
                 val_loss = -np.average(
                     np.sum(np.log(output_p) * encodes_val, axis=1))
                 print "Posterior step:", j, "loss:", loss, val_loss
-
+            ######################TRPO
             # Computing returns and estimating advantage function.
             path_idx = 0
             for path in paths:
-                file_path = "/home/yunzhu/Desktop/log/iter_%d_path_%d.txt" % (i, path_idx)
+                file_path = "/home/slxlab/Downloads/log/iter_%d_path_%d.txt" % (i, path_idx)
                 f = open(file_path, "w")
                 path["baselines"] = self.baseline.predict(path)
                 output_d = self.discriminate.predict(
@@ -480,6 +486,8 @@ class TRPOAgent(object):
             fullstep = stepdir / lm
             neggdotstepdir = -g.dot(stepdir)
 
+
+
             def loss(th):
                 self.sff(th)
                 return self.sess.run(self.losses[0], feed_dict=feed)
@@ -505,7 +513,7 @@ class TRPOAgent(object):
             if entropy != entropy:
                 exit(-1)
 
-            param_dir = "/home/yunzhu/Desktop/params/"
+            param_dir = "/home/slxlab/Downloads/params/"
             print("Now we save model")
             self.generator.save_weights(
                 param_dir + "generator_model_%d.h5" % i, overwrite=True)

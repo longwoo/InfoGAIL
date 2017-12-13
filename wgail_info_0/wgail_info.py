@@ -13,11 +13,10 @@ from models import TRPOAgent
 
 
 def playGame(finetune=0):
-
-    demo_dir = "/home/yunzhu/Desktop/human_0/"
-    param_dir = "/home/yunzhu/Desktop/wgail_info_params_0/"
-    pre_actions_path = "/home/yunzhu/Desktop/human_0/pre_actions.npz"
-    feat_dim = [7, 13, 1024]
+    demo_dir = "/home/slxlab/Downloads/human_0/"
+    param_dir = "/home/slxlab/Downloads/wgail_info_params_0/"
+    pre_actions_path = "/home/slxlab/Downloads/human_0/pre_actions.npz"
+    feat_dim = [7, 13, 1024]#feature dimension after resNet filter
     img_dim = [50, 50, 3]
     aux_dim = 10
     encode_dim = 2

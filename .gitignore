@@ -1,0 +1,7 @@
+*.txt~
+*.pyc
+.idea/
+.idea/
+.cpp~
+.h~
+*~

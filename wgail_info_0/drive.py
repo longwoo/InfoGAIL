@@ -11,15 +11,17 @@ from models import Generator
 from keras.models import Model
 import cv2
 
-code = 0
+code = 1
 
 feat_dim = [7, 13, 1024]
 aux_dim = 10
 encode_dim = 2
 action_dim = 3
-pre_actions_path = "/home/yunzhu/Desktop/human_0/pre_actions.npz"
-param_path = "/home/yunzhu/Desktop/wgail_info_params_0/params/generator_model_37.h5"
+pre_actions_path = "/home/slxlab/Downloads/human_0/pre_actions.npz"
+param_path = "/home/slxlab/Downloads/wgail_info_params_0/params/generator_model_37.h5"
 
+# pre_actions_path = "/home/slxlab/Downloads/human_1/pre_actions.npz"
+# param_path = "/home/slxlab/Downloads/wgail_info_params_1/params/generator_model_27.h5"
 MAX_STEP_LIMIT = 300
 MIN_STEP_LIMIT = 100
 PRE_STEP = 100

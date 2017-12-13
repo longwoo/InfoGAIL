@@ -40,7 +40,7 @@ def gauss_prob(mu, logstd, x):
     gp = tf.exp(-tf.square(x - mu)/(2*var)) / ((2*np.pi)**.5 * std)
     return tf.reduce_prod(gp, [1])
 
-def gauss_log_prob(mu, logstd, x):
+def gauss_log_prob(mu, logstd, x):#iid
     var = tf.exp(2*logstd)
     gp = -tf.square(x - mu)/(2 * var) - .5*tf.log(tf.constant(2*np.pi)) - logstd
     return tf.reduce_sum(gp, [1])

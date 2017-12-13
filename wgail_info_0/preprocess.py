@@ -72,12 +72,12 @@ def main():
     aux_dim = 66
     action_dim = 3
     num_patch = 120
-    demo_path = "/home/yunzhu/Desktop/human_low/demo_"
+    demo_path = "/home/slxlab/Downloads/human_low/demo_"
 
     imgs, auxs, actions = collect_demo(demo_path, num_patch, aux_dim, action_dim)
     auxs = normalize(auxs)
 
-    np.savez_compressed("/home/yunzhu/Desktop/human_low/demo.npz",
+    np.savez_compressed("/home/slxlab/Downloads/human_low/demo.npz",
                         imgs=imgs, auxs=auxs, actions=actions)
     print "Finished."
 
