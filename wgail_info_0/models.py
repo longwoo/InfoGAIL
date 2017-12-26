@@ -21,7 +21,7 @@ from keras.utils.np_utils import to_categorical
 
 parser = argparse.ArgumentParser(description="TRPO")
 # parser.add_argument("--paths_per_collect", type=int, default=3)
-parser.add_argument("--paths_per_collect", type=int, default=30)
+parser.add_argument("--paths_per_collect", type=int, default=1)
 parser.add_argument("--max_step_limit", type=int, default=300)
 parser.add_argument("--min_step_limit", type=int, default=100)
 parser.add_argument("--pre_step", type=int, default=100)
@@ -41,9 +41,9 @@ parser.add_argument("--p_iter", type=int, default=50)
 # parser.add_argument("--buffer_size", type=int, default=75)
 # parser.add_argument("--sample_size", type=int, default=50)
 # parser.add_argument("--batch_size", type=int, default=500)
-parser.add_argument("--buffer_size", type=int, default=75)
-parser.add_argument("--sample_size", type=int, default=50)
-parser.add_argument("--batch_size", type=int, default=500)
+parser.add_argument("--buffer_size", type=int, default=1)
+parser.add_argument("--sample_size", type=int, default=1)
+parser.add_argument("--batch_size", type=int, default=1)
 
 
 args = parser.parse_args()
@@ -118,6 +118,7 @@ class TRPOAgent(object):
 
         eps = 1e-8
         self.action_dist_mu = action_dist_mu
+        self.show_action_dist_mu = self.generator.outputs[0]
         self.action_dist_logstd = action_dist_logstd
         N = tf.shape(feats)[0]
         # compute probabilities of current actions and old actions
@@ -135,11 +136,24 @@ class TRPOAgent(object):
 
         self.losses = [surr, kl, ent]
         self.pg = flatgrad(surr, var_list)
-        # KL divergence where first arg is fixed
-        kl_firstfixed = gauss_selfKL_firstfixed(action_dist_mu,
-                                                action_dist_logstd) / Nf
+        # KL divergence where first arg is fixed :mean KL
+        # kl_firstfixed = tf.reduce_sum(tf.stop_gradient(
+        #     oldaction_dist_mu) * tf.log(tf.stop_gradient(oldaction_dist_mu + eps) / (action_dist_mu + eps))) / Nf
+
+        kl_firstfixed = gauss_selfKL_firstfixed(oldaction_dist_mu, oldaction_dist_logstd,
+                                                action_dist_mu,action_dist_logstd) / Nf
+
+        # kl_firstfixed = gauss_selfKL_firstfixed(action_dist_mu,
+        #                                         action_dist_logstd) / Nf
+        self.show_kl = kl
+        self.show_kl_firstfixed = kl_firstfixed
         grads = tf.gradients(kl_firstfixed, var_list)
+        self.show_grads = tf.gradients(kl_firstfixed, var_list)
+        self.show_ggrads = tf.gradients(self.show_grads, var_list)
+
         self.flat_tangent = tf.placeholder(dtype, shape=[None])
+
+
         shapes = map(var_shape, var_list)
         start = 0
         tangents = []
@@ -149,8 +163,18 @@ class TRPOAgent(object):
             tangents.append(param)
             start += size
         gvp = [tf.reduce_sum(g * t) for (g, t) in zip(grads, tangents)]
+
+
+        self.show_gvp = gvp
+        self.show_tangents = tangents
+        self.show_fvp = flatgrad(gvp, var_list)
+        self.show_ggvp = tf.gradients(self.show_gvp, var_list)
+
         self.fvp = flatgrad(gvp, var_list)
         self.gf = GetFlat(self.sess, var_list)
+
+
+
         self.sff = SetFromFlat(self.sess, var_list)
         self.baseline = NNBaseline(sess, feat_dim, aux_dim, encode_dim,
                                    self.config.lr_baseline, self.config.b_iter,
@@ -300,12 +324,13 @@ class TRPOAgent(object):
         # for i in xrange(38, config.n_iter):
         for i in xrange(0, config.n_iter):
             print "config.n_iter =======", config.n_iter
-            # Generating paths.
-            paths_per_collect = 10
+            # Step1: Generating paths (samples).
+            paths_per_collect = 1
             # if i == 38:
             #     paths_per_collect = 3#30
             # else:
             #     paths_per_collect = 1#10
+
             rollouts = rollout_contin(
                 self.env,
                 self,
@@ -346,7 +371,7 @@ class TRPOAgent(object):
 
             print "Epoch:", i, "Total sampled data points:", feats_n.shape[0]
 
-            # Train discriminator
+            #Step2: Train discriminator
             numnototal = feats_n.shape[0]
             batch_size = config.batch_size
             start_d = self.demo_idx
@@ -385,7 +410,8 @@ class TRPOAgent(object):
             idx = np.arange(numnototal)
             np.random.shuffle(idx)
             train_val_ratio = 0.7
-            # Training data for posterior
+
+            #Step3: Training data for posterior
             numno_train = int(numnototal * train_val_ratio)
             imgs_train = imgs_n[idx][:numno_train]
             auxs_train = auxs_n[idx][:numno_train]
@@ -421,8 +447,10 @@ class TRPOAgent(object):
                 val_loss = -np.average(
                     np.sum(np.log(output_p) * encodes_val, axis=1))
                 print "Posterior step:", j, "loss:", loss, val_loss
-            ######################TRPO
-            # Computing returns and estimating advantage function.
+
+            #####################
+            # Step4: Do TRPO
+            # Step4.1:Computing returns and estimating advantage function.
             path_idx = 0
             for path in paths:
                 file_path = "/home/slxlab/Downloads/log/iter_%d_path_%d.txt" % (i, path_idx)
@@ -432,6 +460,11 @@ class TRPOAgent(object):
                     [path["imgs"], path["auxs"], path["actions"]])
                 output_p = self.posterior_target.predict(
                     [path["imgs"], path["auxs"], path["actions"]])
+
+                # Computing total rewards:R = +L_{I}
+                print np.ones(path["raws"].shape[0]) * 2
+                print output_d.flatten() * 0.1
+                print np.sum(np.log(output_p) * path["encodes"], axis=1)
                 path["rewards"] = np.ones(path["raws"].shape[0]) * 2 + \
                         output_d.flatten() * 0.1 + \
                         np.sum(np.log(output_p) * path["encodes"], axis=1)
@@ -443,6 +476,8 @@ class TRPOAgent(object):
                         path_baselines[:-1]
                 # path["returns"] = discount(path["rewards"], config.gamma)
                 # path["advants"] = path["returns"] - path["baselines"]
+
+                # Computing advantage function:A = r - b
                 path["advants"] = discount(deltas, config.gamma * config.lam)
                 path["returns"] = discount(path["rewards"], config.gamma)
 
@@ -475,24 +510,40 @@ class TRPOAgent(object):
 
             def fisher_vector_product(p):
                 feed[self.flat_tangent] = p
+                ggrads = self.sess.run(self.show_ggrads,feed)
+                action = self.sess.run(self.show_action_dist_mu, feed)
+                kl = self.sess.run(self.show_kl, feed)
+                kl_fix = self.sess.run(self.show_kl_firstfixed, feed)
+                ggvp = self.sess.run(self.show_ggvp, feed)
+                gvp = self.sess.run(self.show_gvp, feed)
+                grads = self.sess.run(self.show_grads, feed_dict=feed)
+                fangents = self.sess.run(self.show_tangents, feed)
+                fvp = self.sess.run(self.show_fvp, feed)
                 return self.sess.run(self.fvp, feed) + p * config.cg_damping
 
             g = self.sess.run(self.pg, feed_dict=feed)
+
+
+            feed[self.flat_tangent] = -g
+            kl_fix = self.sess.run(self.show_kl_firstfixed, feed)
+            gvp = self.sess.run(self.show_gvp, feed)
+            grads = self.sess.run(self.show_grads, feed_dict=feed)
+            # unscaled S_{u}=F^{-1}*g
             stepdir = conjugate_gradient(fisher_vector_product, -g)
-            shs = .5 * stepdir.dot(fisher_vector_product(stepdir))
+
+            #add KL constrant to stepsize ,rescale stepdir
+            shs = .5 * stepdir.dot(fisher_vector_product(stepdir))#0.5s^T*Fs
             assert shs > 0
 
             lm = np.sqrt(shs / config.max_kl)
-            fullstep = stepdir / lm
+            fullstep = stepdir / lm  #S = S_{u}*sqrt{(2kl)/(shs)}
             neggdotstepdir = -g.dot(stepdir)
-
-
 
             def loss(th):
                 self.sff(th)
                 return self.sess.run(self.losses[0], feed_dict=feed)
             theta = linesearch(loss, thprev, fullstep, neggdotstepdir / lm)
-            self.sff(theta)
+            self.sff(theta)#assign
 
             surrafter, kloldnew, entropy = self.sess.run(
                 self.losses, feed_dict=feed

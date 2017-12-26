@@ -45,9 +45,14 @@ def gauss_log_prob(mu, logstd, x):#iid
     gp = -tf.square(x - mu)/(2 * var) - .5*tf.log(tf.constant(2*np.pi)) - logstd
     return tf.reduce_sum(gp, [1])
 
-def gauss_selfKL_firstfixed(mu, logstd):
-    mu1, logstd1 = map(tf.stop_gradient, [mu, logstd])
-    mu2, logstd2 = mu, logstd
+# def gauss_selfKL_firstfixed(mu, logstd):
+#     mu1, logstd1 = map(tf.stop_gradient, [mu, logstd])
+#     mu2, logstd2 = mu, logstd
+#     return gauss_KL(mu1, logstd1, mu2, logstd2)
+
+def gauss_selfKL_firstfixed(mu1, logstd1, mu2, logstd2):
+    tf.stop_gradient(mu1)
+    tf.stop_gradient(logstd1)
     return gauss_KL(mu1, logstd1, mu2, logstd2)
 
 def gauss_KL(mu1, logstd1, mu2, logstd2):
@@ -56,7 +61,7 @@ def gauss_KL(mu1, logstd1, mu2, logstd2):
     kl = tf.reduce_sum(logstd2 - logstd1 + (var1 + tf.square(mu1 - mu2))/(2*var2) - 0.5)
     return kl
 
-def gauss_ent(mu, logstd):
+def gauss_ent(mu, logstd):#0.5+0.5*ln2pi+logstd
     h = tf.reduce_sum(logstd + tf.constant(0.5*np.log(2*np.pi*np.e), tf.float32))
     return h
 
@@ -371,9 +376,9 @@ def linesearch(f, x, fullstep, expected_improve_rate):
             return xnew
     return x
 
-def conjugate_gradient(f_Ax, b, cg_iters=10, residual_tol=1e-10):
-    p = b.copy()
-    r = b.copy()
+def conjugate_gradient(f_Ax, b, cg_iters=10, residual_tol=1e-10):#psi = 0.5x^t*A*x-b^t*x
+    p = b.copy() #conjugate directions
+    r = b.copy()#residul r = Ax - b = d_psi
     x = np.zeros_like(b)
     rdotr = r.dot(r)
     for i in xrange(cg_iters):

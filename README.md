@@ -121,3 +121,64 @@ cp -r torcs_config_ai_0 ~/.torcs
 [SnakeOil](http://xed.ch/project/snakeoil/index.html)
 
 [Simulated Car Racing Championship Competition Software Manual](https://pdfs.semanticscholar.org/9b1d/e5d93854d9dc364a4bc6a462193ccc3ea895.pdf)
+
+
+### Update to tensorflow1.0+ and keras2.0.0
+
+1. Install new tools:
+
+```
+sudo pip install tensorflow
+sudo pip install keras
+```
+
+2. open `InfoGAIL/wgail_info_0/driver.py` and edit:
+
+line 6
+ 
+```
+from keras.initializers import normal, identity, uniform
+```
+line 179 to 184
+```
+steer = Dense(1, activation=’tanh’, init=lambda shape, name:
+normal(shape, scale=1e-4, name=name))(h)
+accel = Dense(1, activation=’sigmoid’, init=lambda shape, name:
+normal(shape, scale=1e-4, name=name))(h)
+brake = Dense(1, activation=’sigmoid’, init=lambda shape, name:
+normal(shape, scale=1e-4, name=name))(h)
+```
+into
+```
+steer = Dense(1, activation='tanh', init=lambda shape: normal1(shape))(h)
+accel = Dense(1, activation='sigmoid', init=lambda shape: normal1(shape))(h)
+brake = Dense(1, activation='sigmoid', init=lambda shape: normal1(shape))(h)
+```
+
+the same as line 582 to 587
+
+
+3. open `InfoGAIL/wgail_info_0/utils.py` and edit:
+
+line 77 to 78
+```
+return tf.concat(0, [tf.reshape(grad, [numel(v)])
+for (v, grad) in zip(var_list, grads)])
+```
+into
+
+```
+return tf.concat(axis=0, values=[tf.reshape(grad, [numel(v)])
+for (v, grad) in zip(var_list, grads)])
+```
+
+line 333
+```
+self.op = tf.concat(0, [tf.reshape(v, [numel(v)]) for v in var_list])
+```
+into 
+```
+self.op = tf.concat(axis=0, values=[tf.reshape(v, [numel(v)]) for v in var_list])
+```
+
+4. The same as `InfoGAIL/wgail_info_1/`
